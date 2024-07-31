@@ -1,1 +1,1 @@
-Interpreter that converts LUA code to PDXScript.
+Interpreter built in Rust that converts LUA code to PDXScript.
