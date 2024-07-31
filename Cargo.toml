@@ -1,5 +1,7 @@
 [workspace]
+resikver = "2"
 
 members = [
-    "interpreter"
+    "interpreter",
+    "pdxlua"
 ]
