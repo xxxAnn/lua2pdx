@@ -2,6 +2,7 @@
 resikver = "2"
 
 members = [
-    "interpreter",
-    "pdxlua"
+    "parser",
+    "pdxlua",
+    "compiler"
 ]

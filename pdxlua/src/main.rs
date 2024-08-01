@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 
-use interpreter::Lexicalizer;
+use parser::Lexicalizer;
 
 fn main() {
     let args: Vec<String> = env::args().collect();

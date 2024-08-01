@@ -3,12 +3,19 @@
 version = 3
 
 [[package]]
-name = "interpreter"
+name = "compiler"
+version = "0.1.0"
+dependencies = [
+ "parser",
+]
+
+[[package]]
+name = "parser"
 version = "0.1.0"
 
 [[package]]
 name = "pdxlua"
 version = "0.1.0"
 dependencies = [
- "interpreter",
+ "parser",
 ]

@@ -1,7 +1,7 @@
 mod token;
 mod arranger;
 
-use token::Token;
+pub use token::Token;
 use arranger::Arranger;
 
 
@@ -10,6 +10,7 @@ pub struct Lexicalizer {
     current_line: usize,
     arranger: Arranger
 }
+
 impl Lexicalizer {
     pub fn new(input: String) -> Self {
         let mut lex = Lexicalizer {

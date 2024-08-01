@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Token {
     Keyword(Keyword),
     Name(String),
@@ -26,7 +26,7 @@ impl Token {
 
 /// TokenLiteral represents the different types of literals that can be
 /// represented in the language.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Literal {
     String(String),
     Number(f64),
@@ -63,7 +63,7 @@ impl Literal {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Keyword {
     Equal,
     Require,
@@ -118,7 +118,7 @@ impl Keyword {
 
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Operator {
     Plus,
     Minus,
@@ -126,7 +126,7 @@ pub enum Operator {
     Divide
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ControlFlow {
     If,
     Else,
