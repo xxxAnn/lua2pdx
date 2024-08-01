@@ -27,7 +27,7 @@ impl Token {
 /// TokenLiteral represents the different types of literals that can be
 /// represented in the language.
 #[derive(Debug)]
-enum Literal {
+pub enum Literal {
     String(String),
     Number(f64),
     Boolean(bool),
@@ -37,6 +37,12 @@ enum Literal {
 impl Literal {
     fn from_str(s: &str) -> Option<Literal> {
         if s.starts_with("\"") && s.ends_with("\"") {
+            if s.len() == 1 {
+                return None
+            }
+            if s.len() == 2 {
+                return None
+            }
             Some(Literal::String(s[1..s.len()-1].to_string()))
         }
         else if s == "true" {
@@ -58,7 +64,7 @@ impl Literal {
 }
 
 #[derive(Debug)]
-enum Keyword {
+pub enum Keyword {
     Equal,
     Require,
     Execute,
@@ -113,7 +119,7 @@ impl Keyword {
 }
 
 #[derive(Debug)]
-enum Operator {
+pub enum Operator {
     Plus,
     Minus,
     Multiply,
@@ -121,7 +127,7 @@ enum Operator {
 }
 
 #[derive(Debug)]
-enum ControlFlow {
+pub enum ControlFlow {
     If,
     Else,
     While,
