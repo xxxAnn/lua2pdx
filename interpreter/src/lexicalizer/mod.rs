@@ -29,9 +29,18 @@ impl Lexicalizer {
         //println!("{:?}", self.input[self.current_line].split_whitespace().map(|s| s.to_string()));
     }
 
+    // Sanitize to take into account
+    // Things like parenthesis and commas
     fn sanitize(&mut self, txt: &str) -> String {
         //println!("{:?}", self.stack);
-        if txt.starts_with('(') && txt.len() > 1 {
+        if txt.contains(',') && txt.len() > 1 {
+            let split = txt.split(',').collect::<Vec<&str>>();
+            if split.len() > 1 && split[1].len() > 0 {
+                self.stack.push(split[1].to_string());
+            }
+            self.stack.push(','.to_string());
+            return self.sanitize(&split[0].to_string().to_string())
+        } else if txt.starts_with('(') && txt.len() > 1 {
             self.stack.push(txt[1..].to_string());
             return "(".to_string()
         } else if txt.ends_with(')') && txt.len() > 1 {
@@ -61,6 +70,7 @@ impl Lexicalizer {
             //println!("{:?}", self.stack);
             let text = self.stack.pop().unwrap_or(String::from("."));
             let token = Token::from_str(&self.sanitize(&text));
+            //println!("{:?}", self.stack);
             return Some(token)
         }
     }

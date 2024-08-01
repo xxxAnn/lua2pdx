@@ -60,6 +60,8 @@ impl Literal {
 #[derive(Debug)]
 enum Keyword {
     Equal,
+    Require,
+    Execute,
     Operator(Operator),
     LeftParen,
     RightParen,
@@ -67,6 +69,12 @@ enum Keyword {
     RightCurly,
     LeftBracket,
     RightBracket,
+    Comma,
+    End,
+    Do,
+    Then,
+    Pdx, // Pdxscript
+    Function, // Regular function
     ControlFlow(ControlFlow)
 }
 
@@ -75,6 +83,14 @@ impl Keyword {
     fn from_str(s: &str) -> Option<Keyword> {
         match s {
             "=" => Some(Keyword::Equal),
+            "require" => Some(Keyword::Require),
+            "execute" => Some(Keyword::Execute),
+            "do" => Some(Keyword::Do),
+            "then" => Some(Keyword::Then),
+            "pdx" => Some(Keyword::Pdx),
+            "end" => Some(Keyword::End),
+            "function" => Some(Keyword::Function),
+            "," => Some(Keyword::Comma),
             "+" => Some(Keyword::Operator(Operator::Plus)),
             "-" => Some(Keyword::Operator(Operator::Minus)),
             "*" => Some(Keyword::Operator(Operator::Multiply)),
