@@ -1,4 +1,4 @@
-mod token;
+pub mod token;
 mod arranger;
 
 pub use token::Token;
@@ -56,10 +56,26 @@ impl Lexicalizer {
     }
 }
 
-impl Iterator for Lexicalizer {
+pub struct TokenStream {
+    lex: Lexicalizer
+}
+
+impl IntoIterator for Lexicalizer {
+    type Item = Token;
+    type IntoIter = TokenStream;
+
+    fn into_iter(self) -> Self::IntoIter {
+        TokenStream {
+            lex: self
+        }
+    }
+}
+
+impl Iterator for TokenStream {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.lexicalize()
+        self.lex.lexicalize()
     }
 }
+

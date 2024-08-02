@@ -1,6 +1,13 @@
 //! Grammar module
 //! List of Grammars
 //! 
+//! Legend:
+//! <Expr>
+//!   In an expr:
+//!     {Complex Expr}
+//!  [List]
+//!  Repeat*
+//! 
 //! Building Blocks:
 //! Ignore EOS: [<EOS>]*
 //! Name List: [<Name> <Comma> <{Ignore EOS}>]*
@@ -19,58 +26,55 @@
 //! Function Definition: <Function> <Name> <LeftParen> <{Name List}> <RightParen> <{Compilables}> <End>
 
 use crate::lexic::Token;
+use crate::lexic::token::Literal;
+use crate::lexic::TokenStream;
 
-pub type GrammarType = Box<dyn Grammar>;
-
-pub trait Grammar {
-    fn for_each_grammar(&mut self, f: Box<dyn FnMut(&mut GrammarType) -> bool>) ;
-    fn searching_for(&self, tokens: &[Token]) -> bool; 
-    fn consume(&mut self, tokens: &mut Vec<Token>);
-    fn try_do(&mut self, tokens: &[Token]) -> bool {
-        // Go through each sub grammar
-        // If the sub grammar is searching for the top token
-        // Have the sub grammar consume the top tokens
-        // If the sub grammar is not searching for the top tokens
-        // Return false
-        let mut t = tokens.to_vec();
-
-        self.for_each_grammar(Box::new(move |grammar: &mut GrammarType| {
-            if grammar.searching_for(&t) {
-                grammar.consume(&mut t);
-                true
-            } else {
-                false
-            }
-        }));
-        true
-    }
-    fn is_token(&self, token: &Token) -> bool;
+enum AST {
+    Root(Vec<AST>),
+    Assignment(String, Box<AST>),
+    FunctionDefinition(String, Vec<String>, Vec<AST>),
+    FunctionCall(String, Vec<AST>),
+    TableBody(Vec<(String, AST)>),
+    Literal(Literal)
 }
 
-pub struct Or {
-    grammars: Vec<GrammarType>,
+#[derive(Debug)]
+enum SyntaxError {
+    UnexpectedToken(Token),
+    UnexpectedEnd,
 }
 
-impl<'a> Grammar for Or {
-    fn searching_for(&self, tokens: &[Token]) -> bool {
-        self.grammars.iter().any(|g| g.searching_for(tokens))
-    }
+pub struct SyntaxParser {
+    tokens: TokenStream,
+    current: Option<Token>
+}
 
-    fn consume(&mut self, tokens: &mut Vec<Token>) {
-        for grammar in self.grammars.iter_mut() {
-            if grammar.searching_for(tokens) {
-                grammar.consume(tokens);
-            }
+impl SyntaxParser {
+
+    fn current_token(&self) -> Option<Token> {
+        if let Some(token) = self.current {
+            Some(token)
+        } else {
+            self.tokens.next()
         }
     }
 
-    fn is_token(&self, token: &Token) -> bool {
-        false 
+    fn to_next_token(&mut self) {
+        self.current = None;
+    }
+
+    fn consume(&mut self, expected: Token) -> Result<(), ParseError> {
+        if let Some(token) = self.current_token() {
+            if token == expected {
+                self.to_next_token();
+            } else {
+                Err(ParseError::UnexpectedToken(token.clone()))
+            }
+        } else {
+            Err(ParseError::UnexpectedEnd)
+        }
     }
     
-    fn for_each_grammar(&mut self, mut f: Box<dyn FnMut(&mut GrammarType) -> bool>) {
-        for grammar in self.grammars.iter_mut() {
-            if !f(grammar) { break }
-        }
-    }
+    fn consume_token
 }
+
