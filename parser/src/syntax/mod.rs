@@ -15,7 +15,8 @@
 //! Assign List: [<Name> <Equal> <Name/Literal> <Comma> <{Ignore EOS}>]*
 //! Function Call: <Name> <LeftParen> <{Simple List}> <RightParen>
 //! Table Body: <LeftCurly> <{Assign List}> <RightCurly>
-//! Resolvable: <Name/Literal/{Function Call}/{Table Body}>
+//! Raw Function: <Function> <LeftParen> <{Name List}> <RightParen> <{Compilables}> <End>
+//! Resolvable: <Name/Literal/{Function Call}/{Table Body}/{Raw Function}>
 //! 
 //! Special:
 //! Compilables: [<{Compilable}>]*
@@ -24,18 +25,26 @@
 //! Root: <{Compilables}>
 //! Assignment: <Name> <Equal> <{Resolvable}>
 //! Function Definition: <Function> <Name> <LeftParen> <{Name List}> <RightParen> <{Compilables}> <End>
+//! Function Call: <Name> <LeftParen> <{Simple List}> <RightParen>
+
+use std::string::ParseError;
 
 use crate::lexic::Token;
 use crate::lexic::token::Literal;
 use crate::lexic::TokenStream;
 
 enum AST {
-    Root(Vec<AST>),
-    Assignment(String, Box<AST>),
+    Assignment(String, Box<AST>), 
+    // Created by <Name> <Equal> <{Raw Function}> as well
     FunctionDefinition(String, Vec<String>, Vec<AST>),
     FunctionCall(String, Vec<AST>),
     TableBody(Vec<(String, AST)>),
+    Variable(String),
     Literal(Literal)
+}
+
+pub struct SyntaxTree {
+    root: Vec<AST>
 }
 
 #[derive(Debug)]
@@ -74,7 +83,15 @@ impl SyntaxParser {
             Err(ParseError::UnexpectedEnd)
         }
     }
-    
-    fn consume_token
+
+    /// Ignore EOS: [<EOS>]*
+    fn ignore_eos(&mut self) {
+        while let Some(token) = self.current_token() {
+            if token != Token::EOS {
+                break
+            }
+            self.to_next_token();
+        }
+    }
 }
 
