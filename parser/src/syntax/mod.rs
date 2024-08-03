@@ -76,6 +76,7 @@ impl SyntaxParser {
         if let Some(token) = self.current_token() {
             if token == expected {
                 self.to_next_token();
+                Ok(())
             } else {
                 Err(ParseError::UnexpectedToken(token.clone()))
             }
