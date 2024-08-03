@@ -20,14 +20,12 @@
 //! 
 //! Special:
 //! Compilables: [<{Compilable}>]*
+//! Root: <{Compilables}>
 //! 
 //! Compilable:
-//! Root: <{Compilables}>
 //! Assignment: <Name> <Equal> <{Resolvable}>
 //! Function Definition: <Function> <Name> <LeftParen> <{Name List}> <RightParen> <{Compilables}> <End>
 //! Function Call: <Name> <LeftParen> <{Simple List}> <RightParen>
-
-use std::string::ParseError;
 
 use crate::lexic::Token;
 use crate::lexic::token::Literal;
@@ -72,26 +70,31 @@ impl SyntaxParser {
         self.current = None;
     }
 
-    fn consume(&mut self, expected: Token) -> Result<(), ParseError> {
+    fn consume(&mut self, expected: Token) -> Result<(), SyntaxError> {
         if let Some(token) = self.current_token() {
             if token == expected {
                 self.to_next_token();
                 Ok(())
             } else {
-                Err(ParseError::UnexpectedToken(token.clone()))
+                Err(SyntaxError::UnexpectedToken(token.clone()))
             }
         } else {
-            Err(ParseError::UnexpectedEnd)
+            Err(SyntaxError::UnexpectedEnd)
         }
     }
 
     /// Ignore EOS: [<EOS>]*
-    fn ignore_eos(&mut self) {
+    fn ignore_eos(&mut self) -> Result<(), SyntaxError> {
         while let Some(token) = self.current_token() {
             if token != Token::EOS {
                 break
             }
             self.to_next_token();
+        }
+        if self.current_token().is_none() {
+            Err(SyntaxError::UnexpectedEnd)
+        } else {
+            Ok(())
         }
     }
 }
