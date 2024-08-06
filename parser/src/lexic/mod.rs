@@ -16,7 +16,7 @@ impl Lexicalizer {
         let mut lex = Lexicalizer {
             input: input.lines().map(|s| s.to_string()).collect(),
             current_line: 0,
-            arranger: Arranger::new(&[',', '(', ')', '[', ']'])
+            arranger: Arranger::new(&[',', '(', ')', '[', ']', '#'])
         };
 
         lex.update_stack();
@@ -33,6 +33,10 @@ impl Lexicalizer {
         self.arranger.arrange(txt)
     }
 
+    fn empty_stack(&mut self) {
+        self.arranger.set_stack(Vec::new());
+    }
+
     pub fn lexicalize(&mut self) -> Option<Token> {
         if self.current_line >= self.input.len() || (self.current_line == self.input.len()-1 && self.arranger.is_empty()) {
             return None
@@ -47,6 +51,10 @@ impl Lexicalizer {
             let text = self.arranger.pop().unwrap_or(String::from("."));
             let arranged = self.arrange(&text);
             if arranged == "" {
+                return None
+            }
+            if arranged == "#" {
+                self.empty_stack();
                 return None
             }
             let token = Token::from_str(&arranged);
@@ -76,6 +84,23 @@ impl Iterator for TokenStream {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.lex.lexicalize()
+    }
+}
+
+impl TokenStream {
+    pub fn ignore_eos(&mut self, current_token: Token) -> Result<(), &'static str> {
+        let mut ctoken = Some(current_token);
+        while let Some(token) = ctoken.clone() {
+            if std::mem::discriminant(&token) != std::mem::discriminant(&Token::EOS) {
+                break
+            }
+            ctoken = self.next()
+        }
+        if ctoken.is_none() {
+            Err("No more tokens")
+        } else {
+            Ok(())
+        }
     }
 }
 

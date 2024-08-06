@@ -28,39 +28,45 @@
 //! Function Call: <Name> <LeftParen> <{Simple List}> <RightParen>
 
 use crate::lexic::Token;
-use crate::lexic::token::Literal;
+use crate::lexic::token::{Keyword, Literal};
 use crate::lexic::TokenStream;
 
-enum AST {
-    Assignment(String, Box<AST>), 
-    // Created by <Name> <Equal> <{Raw Function}> as well
-    FunctionDefinition(String, Vec<String>, Vec<AST>),
-    FunctionCall(String, Vec<AST>),
-    TableBody(Vec<(String, AST)>),
-    Variable(String),
-    Literal(Literal)
-}
+mod grammar;
 
-pub struct SyntaxTree {
-    root: Vec<AST>
-}
+use grammar::{StatementBuilder, Statement};
+
+pub use grammar::{Grammar, RuleBuilder};
 
 #[derive(Debug)]
-enum SyntaxError {
+pub enum SyntaxError {
     UnexpectedToken(Token),
     UnexpectedEnd,
 }
 
 pub struct SyntaxParser {
     tokens: TokenStream,
-    current: Option<Token>
+    current: Option<Token>,
+    grammar: Grammar,
+}
+
+pub struct SyntaxTree {
+    root: Vec<Statement>,
 }
 
 impl SyntaxParser {
 
-    fn current_token(&self) -> Option<Token> {
-        if let Some(token) = self.current {
-            Some(token)
+
+    pub fn new(tokens: TokenStream, grammar: Grammar) -> Self {
+        Self {
+            tokens,
+            current: None,
+            grammar,
+        }
+    }
+
+    fn current_token(&mut self) -> Option<Token> {
+        if let Some(token) = &self.current {
+            Some(token.clone())
         } else {
             self.tokens.next()
         }
@@ -70,32 +76,26 @@ impl SyntaxParser {
         self.current = None;
     }
 
-    fn consume(&mut self, expected: Token) -> Result<(), SyntaxError> {
-        if let Some(token) = self.current_token() {
-            if token == expected {
-                self.to_next_token();
-                Ok(())
-            } else {
-                Err(SyntaxError::UnexpectedToken(token.clone()))
-            }
-        } else {
-            Err(SyntaxError::UnexpectedEnd)
-        }
-    }
-
     /// Ignore EOS: [<EOS>]*
     fn ignore_eos(&mut self) -> Result<(), SyntaxError> {
-        while let Some(token) = self.current_token() {
-            if token != Token::EOS {
-                break
+        match self.current_token() {
+            Some(t) => {
+                self.tokens.ignore_eos(t).map_err(|_| SyntaxError::UnexpectedEnd)
             }
-            self.to_next_token();
-        }
-        if self.current_token().is_none() {
-            Err(SyntaxError::UnexpectedEnd)
-        } else {
-            Ok(())
+            _ => Ok(()),
         }
     }
-}
 
+    fn parse_root(&mut self) -> Result<SyntaxTree, SyntaxError> {
+        let mut root = Vec::new();
+        while let Some(token) = self.current_token() {
+            self.ignore_eos()?;
+            root.push(StatementBuilder::new(self.grammar.clone()).build(&mut self.tokens));
+        }
+        Ok(SyntaxTree { root })
+    }
+
+    pub fn parse(&mut self) -> Result<SyntaxTree, SyntaxError> {
+        self.parse_root()
+    }
+}

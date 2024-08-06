@@ -1,4 +1,4 @@
-#[derive(Debug, Copy)]
+#[derive(Debug, Clone)]
 pub enum Token {
     Keyword(Keyword),
     Name(String),
@@ -26,7 +26,7 @@ impl Token {
 
 /// TokenLiteral represents the different types of literals that can be
 /// represented in the language.
-#[derive(Debug, Copy)]
+#[derive(Debug, Clone)]
 pub enum Literal {
     String(String),
     Number(f64),
@@ -63,12 +63,11 @@ impl Literal {
     }
 }
 
-#[derive(Debug, Copy)]
+#[derive(Debug, Clone)]
 pub enum Keyword {
     Equal,
     Require,
     Execute,
-    Operator(Operator),
     LeftParen,
     RightParen,
     LeftCurly,
@@ -81,7 +80,17 @@ pub enum Keyword {
     Then,
     Pdx, // Pdxscript
     Function, // Regular function
-    ControlFlow(ControlFlow)
+    // Control Flow
+    If,
+    Else,
+    While,
+    For,
+    Return,
+    // Operator
+    Plus,
+    Minus,
+    Multiply,
+    Divide
 }
 
 impl Keyword {
@@ -97,40 +106,33 @@ impl Keyword {
             "end" => Some(Keyword::End),
             "function" => Some(Keyword::Function),
             "," => Some(Keyword::Comma),
-            "+" => Some(Keyword::Operator(Operator::Plus)),
-            "-" => Some(Keyword::Operator(Operator::Minus)),
-            "*" => Some(Keyword::Operator(Operator::Multiply)),
-            "/" => Some(Keyword::Operator(Operator::Divide)),
+            "+" => Some(Keyword::Plus),
+            "-" => Some(Keyword::Minus),
+            "*" => Some(Keyword::Multiply),
+            "/" => Some(Keyword::Divide),
             "(" => Some(Keyword::LeftParen),
             ")" => Some(Keyword::RightParen),
             "{" => Some(Keyword::LeftCurly),
             "}" => Some(Keyword::RightCurly),
             "[" => Some(Keyword::LeftBracket),
             "]" => Some(Keyword::RightBracket),
-            "if" => Some(Keyword::ControlFlow(ControlFlow::If)),
-            "else" => Some(Keyword::ControlFlow(ControlFlow::Else)),
-            "while" => Some(Keyword::ControlFlow(ControlFlow::While)),
-            "for" => Some(Keyword::ControlFlow(ControlFlow::For)),
-            "return" => Some(Keyword::ControlFlow(ControlFlow::Return)),
+            "if" => Some(Keyword::If),
+            "else" => Some(Keyword::Else),
+            "while" => Some(Keyword::While),
+            "for" => Some(Keyword::For),
+            "return" => Some(Keyword::Return),
             _ => None
         }
     }
 
 }
 
-#[derive(Debug, Copy)]
+#[derive(Debug, Clone)]
 pub enum Operator {
-    Plus,
-    Minus,
-    Multiply,
-    Divide
+    
 }
 
-#[derive(Debug, Copy)]
+#[derive(Debug, Clone)]
 pub enum ControlFlow {
-    If,
-    Else,
-    While,
-    For,
-    Return
+x
 }
