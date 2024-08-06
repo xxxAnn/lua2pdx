@@ -1,14 +1,14 @@
 pub struct Arranger {
     stack: Vec<String>,
-    special_chars: Vec<char>
+    special_chars: Vec<String>
 }
 
 impl Arranger {
 
-    pub fn new(special_chars: &[char]) -> Self {
+    pub fn new(special_chars: Vec<impl Into<String>>) -> Self {
         Arranger {
             stack: Vec::new(),
-            special_chars: special_chars.to_owned()
+            special_chars: special_chars.into_iter().map(|s| s.into()).collect::<Vec<_>>()
         } 
     }
 
@@ -24,8 +24,8 @@ impl Arranger {
     fn separate_special_chars(&mut self, txt: &str) -> String {
         if txt.len() > 1 {
             for chr in self.special_chars.clone() {
-                if txt.contains(chr) {
-                    let split = txt.splitn(2, chr).collect::<Vec<&str>>();
+                if txt.contains(&chr) {
+                    let split = txt.splitn(2, &chr).collect::<Vec<&str>>();
                     //println!("\n{:?}", txt);
                     //println!("{:?}", split);
                     let after = split[1..].join("");

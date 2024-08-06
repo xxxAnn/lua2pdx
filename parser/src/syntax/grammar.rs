@@ -279,6 +279,8 @@ impl StatementBuilder {
         self.select_rule(token_stream, token.clone());
 
         dbg!(self.get_rule());
+        dbg!(self.saved_tokens.clone());
+        dbg!(token_stream.current().unwrap());
 
         todo!("Implement the rest of the function")
     }

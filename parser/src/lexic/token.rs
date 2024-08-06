@@ -181,13 +181,3 @@ impl Keyword {
     }
 
 }
-
-#[derive(Debug, Clone)]
-pub enum Operator {
-    
-}
-
-#[derive(Debug, Clone)]
-pub enum ControlFlow {
-x
-}

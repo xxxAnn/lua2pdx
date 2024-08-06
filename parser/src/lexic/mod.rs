@@ -16,7 +16,7 @@ impl Lexicalizer {
         let mut lex = Lexicalizer {
             input: input.lines().map(|s| s.to_string()).collect(),
             current_line: 0,
-            arranger: Arranger::new(&[',', '(', ')', '[', ']', '#'])
+            arranger: Arranger::new([",", "(", ")", "[", "]", "--"].to_vec())
         };
 
         lex.update_stack();
@@ -53,7 +53,7 @@ impl Lexicalizer {
             if arranged == "" {
                 return None
             }
-            if arranged == "#" {
+            if arranged == "--" {
                 self.empty_stack();
                 return None
             }
