@@ -65,7 +65,8 @@ impl Lexicalizer {
 }
 
 pub struct TokenStream {
-    lex: Lexicalizer
+    lex: Lexicalizer,
+    ctoken: Option<Token>
 }
 
 impl IntoIterator for Lexicalizer {
@@ -74,7 +75,8 @@ impl IntoIterator for Lexicalizer {
 
     fn into_iter(self) -> Self::IntoIter {
         TokenStream {
-            lex: self
+            lex: self,
+            ctoken: None
         }
     }
 }
@@ -101,6 +103,19 @@ impl TokenStream {
         } else {
             Ok(())
         }
+    }
+
+    pub fn current(&mut self) -> Option<Token> {
+        if let Some(token) = &self.ctoken {
+            Some(token.clone())
+        } else {
+            self.ctoken = self.next();
+            self.ctoken.clone().map(|t| t.clone())
+        }
+    }
+
+    pub fn advance(&mut self) {
+        self.ctoken = None;
     }
 }
 

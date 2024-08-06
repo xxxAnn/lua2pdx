@@ -65,11 +65,7 @@ impl SyntaxParser {
     }
 
     fn current_token(&mut self) -> Option<Token> {
-        if let Some(token) = &self.current {
-            Some(token.clone())
-        } else {
-            self.tokens.next()
-        }
+        self.tokens.current()
     }
 
     fn to_next_token(&mut self) {
@@ -90,7 +86,7 @@ impl SyntaxParser {
         let mut root = Vec::new();
         while let Some(token) = self.current_token() {
             self.ignore_eos()?;
-            root.push(StatementBuilder::new(self.grammar.clone()).build(&mut self.tokens));
+            root.push(StatementBuilder::new(self.grammar.clone()).build(&mut self.tokens, token));
         }
         Ok(SyntaxTree { root })
     }

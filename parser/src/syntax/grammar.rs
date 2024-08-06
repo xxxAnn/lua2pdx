@@ -5,6 +5,8 @@ use crate::lexic::{token::{self, Keyword}, Token, TokenStream};
 use super::SyntaxError;
 
 use std::collections::HashMap;
+use std::fmt::Formatter;
+use std::fmt::Debug;
 
 #[derive(Clone, Debug)]
 pub struct Grammar {
@@ -160,6 +162,9 @@ impl Rule {
         let mut possible_tokens = Vec::new();
 
         for (i, command) in self.rule.iter().enumerate() {
+            if i > index {
+                break;
+            }
             match command.ctype {
                 CommandType::Get(_) | CommandType::Repeat(_) | CommandType::Or(_, _)  => { 
                     return Err(GrammarError::OverlappingSignature);
@@ -204,6 +209,19 @@ impl TokenMatch {
     
 }
 
+impl Debug for TokenMatch {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TokenMatch::Token(discriminant) => {
+                write!(f, "Token({:?})", Token::from_discriminant(discriminant))
+            },
+            TokenMatch::Keyword(discriminant) => {
+                write!(f, "Keyword({:?})", Keyword::from_discriminant(discriminant))
+            }
+        }
+    }
+}
+
 
 
 impl StatementBuilder {
@@ -223,7 +241,14 @@ impl StatementBuilder {
     }
 
     fn fits_rule_at(&self, token: Token, rule: &Rule, at_index: usize) -> bool {
-        rule.get_possible_tokens_at(at_index, &self.grammar).unwrap().iter().any(|t| t.matches(&token))
+        println!("{} expects {:?} at position {} in signature.\nGot {:?}", rule.name, rule.get_possible_tokens_at(at_index, &self.grammar), at_index, &token);
+        let r = rule.get_possible_tokens_at(at_index, &self.grammar).unwrap().iter().any(|t| t.matches(&token));
+
+        if !r {
+            println!("{} is eliminated.", rule.name);
+        }
+
+        r
     }   
 
     fn get_rule(&self) -> Option<&Rule> {
@@ -236,23 +261,22 @@ impl StatementBuilder {
 
     fn trim_rules(&mut self, token: Token) {
         self.rule_pool = self.rule_pool.clone().into_iter().filter(|r| {
-            r.rule.iter().any(|command| {
-                self.fits_rule_at(token.clone(), r, self.token_index)
-            })
+            self.fits_rule_at(token.clone(), r, self.token_index)
         }).collect();
     }
 
-    fn select_rule(&mut self, stream: &mut TokenStream) {
-        while self.rule_pool.len() != 1 {
-            let token = stream.next().unwrap();
-            self.save_token(token.clone());
-            self.trim_rules(token);
+    fn select_rule(&mut self, stream: &mut TokenStream, token: Token) {
+        while self.rule_pool.len() > 1 {
+            //println!("Ctoken: {:?}", stream.current().unwrap());
+            self.save_token(stream.current().unwrap());
+            self.trim_rules(stream.current().unwrap());
             self.token_index += 1;
+            stream.advance();
         }
     }
 
-    pub fn build(&mut self, token_stream: &mut TokenStream) -> Statement {
-        self.select_rule(token_stream);
+    pub fn build(&mut self, token_stream: &mut TokenStream, token: Token) -> Statement {
+        self.select_rule(token_stream, token.clone());
 
         dbg!(self.get_rule());
 

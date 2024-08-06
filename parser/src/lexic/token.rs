@@ -1,3 +1,5 @@
+use std::{collections::HashMap, mem::Discriminant};
+
 #[derive(Debug, Clone)]
 pub enum Token {
     Keyword(Keyword),
@@ -91,6 +93,59 @@ pub enum Keyword {
     Minus,
     Multiply,
     Divide
+}
+
+impl Token {
+    pub fn from_discriminant(discr: &Discriminant<Token>) -> String {
+        let mut discr_to_token = HashMap::new();
+
+        discr_to_token.insert(std::mem::discriminant(&Token::Keyword(Keyword::Equal)), "Keyword".to_string());
+        discr_to_token.insert(std::mem::discriminant(&Token::Name("".to_string())), "Name".to_string());
+        discr_to_token.insert(std::mem::discriminant(&Token::Literal(Literal::String("".to_string()))), "Literal".to_string());
+        discr_to_token.insert(std::mem::discriminant(&Token::EOS), "EOS".to_string());
+        
+        discr_to_token.get(discr).unwrap().clone()
+    }
+}
+
+
+
+
+impl Keyword {
+    pub fn from_discriminant(discr: &Discriminant<Keyword>) -> Keyword {
+        let mut discr_to_keyword = HashMap::new();
+
+        for keyword in vec![
+            Keyword::Equal,
+            Keyword::Require,
+            Keyword::Execute,
+            Keyword::LeftParen,
+            Keyword::RightParen,
+            Keyword::LeftCurly,
+            Keyword::RightCurly,
+            Keyword::LeftBracket,
+            Keyword::RightBracket,
+            Keyword::Comma,
+            Keyword::End,
+            Keyword::Do,
+            Keyword::Then,
+            Keyword::Pdx,
+            Keyword::Function,
+            Keyword::If,
+            Keyword::Else,
+            Keyword::While,
+            Keyword::For,
+            Keyword::Return,
+            Keyword::Plus,
+            Keyword::Minus,
+            Keyword::Multiply,
+            Keyword::Divide
+        ] {
+            discr_to_keyword.insert(std::mem::discriminant(&keyword), keyword);
+        }
+
+        discr_to_keyword.get(discr).unwrap().clone()
+    }
 }
 
 impl Keyword {

@@ -34,7 +34,7 @@ impl Arranger {
                     }
                     //println!("");
                     self.stack.push(chr.to_string());
-                    println!("{:?}", split[0]);
+                    //println!("{:?}", split[0]);
                     return self.separate_special_chars(&split[0].to_string())
                 }
             }
