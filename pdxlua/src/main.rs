@@ -7,13 +7,22 @@ use parser::Grammar;
 use parser::RuleBuilder;
 use parser::Keyword;
 
+use env_logger;
 
 fn main() {
+
     let args: Vec<String> = env::args().collect();
-    if args.len() != 2 {
-        println!("Usage: pdxlua <filename>");
+    if args.len() <= 2 {
+        println!("Usage: pdxlua <filename> [level]");
         return;
     }
+
+    env_logger::builder()
+        .filter_level(match args.get(2) {
+            Some(level) => level.parse().unwrap_or(log::LevelFilter::Error),
+            _ => log::LevelFilter::Error
+        })
+        .init();
 
     let mut grammar = Grammar::new();
 
@@ -37,6 +46,6 @@ fn main() {
 
     let mut parser = SyntaxParser::new(token_stream, grammar);
 
-    parser.parse();
+    let _ = parser.parse();
 
 }

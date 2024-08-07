@@ -28,7 +28,6 @@
 //! Function Call: <Name> <LeftParen> <{Simple List}> <RightParen>
 
 use crate::lexic::Token;
-use crate::lexic::token::{Keyword, Literal};
 use crate::lexic::TokenStream;
 
 mod grammar;
@@ -36,6 +35,8 @@ mod grammar;
 use grammar::{StatementBuilder, Statement};
 
 pub use grammar::{Grammar, RuleBuilder};
+
+use env_logger;
 
 #[derive(Debug)]
 pub enum SyntaxError {
@@ -57,6 +58,7 @@ impl SyntaxParser {
 
 
     pub fn new(tokens: TokenStream, grammar: Grammar) -> Self {
+
         Self {
             tokens,
             current: None,

@@ -1,7 +1,18 @@
 use std::{collections::HashMap, mem::Discriminant};
+use log::{debug, error, log_enabled, info, Level};
+
+/// Token represents a single token in the language.
+/// It contains the line and character position of the token in the source code
+/// and the type of the token.
+#[derive(Debug, Clone)]
+pub struct Token {
+    line: usize,
+    char: usize,
+    ttype: TokenType
+}
 
 #[derive(Debug, Clone)]
-pub enum Token {
+pub  enum TokenType {
     Keyword(Keyword),
     Name(String),
     Literal(Literal),
@@ -9,20 +20,63 @@ pub enum Token {
 }
 
 impl Token {
-    pub fn from_str(s: &str) -> Token {
+    pub fn from_str(s: &str, line: usize, char: usize) -> Token {
         if let Some(keyword) = Keyword::from_str(s) {
-            Token::Keyword(keyword)
+            Token {
+                line,
+                char,
+                ttype: TokenType::Keyword(keyword)
+            }
         }
         else if let Some(literal) = Literal::from_str(s) {
-            Token::Literal(literal)
+            Token {
+                line,
+                char,
+                ttype: TokenType::Literal(literal)
+            }
         }
         else {
-            Token::Name(s.to_string())
+            Token {
+                line,
+                char,
+                ttype: TokenType::Name(s.to_string())
+            }
         }
     }
 
-    pub fn eos() -> Token {
-        Token::EOS
+    pub fn as_discriminant(&self) -> Discriminant<TokenType> {
+        std::mem::discriminant(&self.ttype)
+    }
+
+    pub fn keyword_discr() -> Discriminant<TokenType> {
+        std::mem::discriminant(&TokenType::Keyword(Keyword::Equal))
+    }
+
+    pub fn name_discr() -> Discriminant<TokenType> {
+        std::mem::discriminant(&TokenType::Name("".to_string()))
+    }
+
+    pub fn literal_discr() -> Discriminant<TokenType> {
+        std::mem::discriminant(&TokenType::Literal(Literal::String("".to_string())))
+    }
+
+    pub fn eos_discr() -> Discriminant<TokenType> {
+        std::mem::discriminant(&TokenType::EOS)
+    }
+
+    pub fn eos(line: usize, char: usize) -> Token {
+        Token {
+            line,
+            char,
+            ttype: TokenType::EOS
+        }
+    }
+
+    pub fn as_keyword(&self) -> Option<&Keyword> {
+        match &self.ttype {
+            TokenType::Keyword(k) => Some(k),
+            _ => None
+        }
     }
 }
 
@@ -96,13 +150,13 @@ pub enum Keyword {
 }
 
 impl Token {
-    pub fn from_discriminant(discr: &Discriminant<Token>) -> String {
+    pub fn from_discriminant(discr: &Discriminant<TokenType>) -> String {
         let mut discr_to_token = HashMap::new();
 
-        discr_to_token.insert(std::mem::discriminant(&Token::Keyword(Keyword::Equal)), "Keyword".to_string());
-        discr_to_token.insert(std::mem::discriminant(&Token::Name("".to_string())), "Name".to_string());
-        discr_to_token.insert(std::mem::discriminant(&Token::Literal(Literal::String("".to_string()))), "Literal".to_string());
-        discr_to_token.insert(std::mem::discriminant(&Token::EOS), "EOS".to_string());
+        discr_to_token.insert(Token::keyword_discr(), "Keyword".to_string());
+        discr_to_token.insert(Token::name_discr(), "Name".to_string());
+        discr_to_token.insert(Token::literal_discr(), "Literal".to_string());
+        discr_to_token.insert(Token::literal_discr(), "EOS".to_string());
         
         discr_to_token.get(discr).unwrap().clone()
     }

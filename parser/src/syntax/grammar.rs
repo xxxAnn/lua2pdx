@@ -1,12 +1,12 @@
 use std::mem::Discriminant;
 
-use crate::lexic::{token::{self, Keyword}, Token, TokenStream};
-
-use super::SyntaxError;
+use crate::lexic::{token::Keyword, Token, TokenStream, TokenType};
 
 use std::collections::HashMap;
 use std::fmt::Formatter;
 use std::fmt::Debug;
+
+use log::{debug, error, log_enabled, info, Level};
 
 #[derive(Clone, Debug)]
 pub struct Grammar {
@@ -21,7 +21,7 @@ struct Command {
 
 #[derive(Clone, Debug)]
 pub enum CommandType {
-    None(Discriminant<Token>),
+    None(Discriminant<TokenType>),
     Keyword(Discriminant<Keyword>),
     Get(String),
     Repeat(Vec<Command>),
@@ -58,7 +58,7 @@ struct Rule {
 }
 
 enum TokenMatch {
-    Token(Discriminant<Token>),
+    Token(Discriminant<TokenType>),
     Keyword(Discriminant<Keyword>)
 }
 
@@ -91,7 +91,7 @@ impl RuleBuilder {
     pub fn add_name(mut self, name: impl Into<String>) -> Self{
         self.rule.push(Command {
             name: name.into(),
-            ctype: CommandType::None(std::mem::discriminant(&Token::Name("".to_string())))
+            ctype: CommandType::None(Token::name_discr())
         });
 
         self
@@ -194,14 +194,14 @@ impl TokenMatch {
     fn matches(&self, token: &Token) -> bool {
         match self {
             TokenMatch::Token(discriminant) => {
-                *discriminant == std::mem::discriminant(token)
+                *discriminant == token.as_discriminant()
             },
             TokenMatch::Keyword(discriminant) => {
-                match token {
-                    Token::Keyword(keyword) => {
+                match token.as_keyword() {
+                    Some(keyword) => {
                         *discriminant == std::mem::discriminant(keyword)
                     },
-                    _ => false
+                    None => false
                 }
             }
         }
@@ -241,11 +241,12 @@ impl StatementBuilder {
     }
 
     fn fits_rule_at(&self, token: Token, rule: &Rule, at_index: usize) -> bool {
-        println!("{} expects {:?} at position {} in signature.\nGot {:?}", rule.name, rule.get_possible_tokens_at(at_index, &self.grammar), at_index, &token);
+        debug!("{} expects {:?} at position {} in signature.", rule.name, rule.get_possible_tokens_at(at_index, &self.grammar), at_index);
+        debug!("Got {:?}", &token);
         let r = rule.get_possible_tokens_at(at_index, &self.grammar).unwrap().iter().any(|t| t.matches(&token));
 
         if !r {
-            println!("{} is eliminated.", rule.name);
+            debug!("{} is eliminated.", rule.name);
         }
 
         r
@@ -267,7 +268,7 @@ impl StatementBuilder {
 
     fn select_rule(&mut self, stream: &mut TokenStream, token: Token) {
         while self.rule_pool.len() > 1 {
-            //println!("Ctoken: {:?}", stream.current().unwrap());
+            debug!("Current token: {:?}", stream.current().unwrap());
             self.save_token(stream.current().unwrap());
             self.trim_rules(stream.current().unwrap());
             self.token_index += 1;
@@ -278,11 +279,17 @@ impl StatementBuilder {
     pub fn build(&mut self, token_stream: &mut TokenStream, token: Token) -> Statement {
         self.select_rule(token_stream, token.clone());
 
-        dbg!(self.get_rule());
-        dbg!(self.saved_tokens.clone());
-        dbg!(token_stream.current().unwrap());
+        info!("Found rule: {:?}", self.get_rule().map(|r| r.name.clone()));
+        info!("Saved tokens: {:?}", &self.saved_tokens.clone()[..(3.min(self.saved_tokens.len()-1))]);
+        info!("Current token: {:?}", token_stream.current().unwrap());
 
-        todo!("Implement the rest of the function")
+        for n in token_stream {
+            debug!("\x1b[93mRemaining token\x1b[0m: {:?}", n);
+        }
+
+        error!("Implement the rest of the function");
+
+        todo!()
     }
 
 }

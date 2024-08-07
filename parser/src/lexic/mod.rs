@@ -2,12 +2,15 @@ pub mod token;
 mod arranger;
 
 pub use token::Token;
+pub use token::TokenType;
 use arranger::Arranger;
 
+use log::{debug, error, log_enabled, info, Level};
 
 pub struct Lexicalizer {
     input: Vec<String>,
     current_line: usize,
+    char: usize,
     arranger: Arranger
 }
 
@@ -16,7 +19,8 @@ impl Lexicalizer {
         let mut lex = Lexicalizer {
             input: input.lines().map(|s| s.to_string()).collect(),
             current_line: 0,
-            arranger: Arranger::new([",", "(", ")", "[", "]", "--"].to_vec())
+            arranger: Arranger::new([",", "(", ")", "[", "]", "--"].to_vec()),
+            char: 0
         };
 
         lex.update_stack();
@@ -26,7 +30,6 @@ impl Lexicalizer {
 
     fn update_stack(&mut self) {
         self.arranger.set_stack(self.input[self.current_line].split_whitespace().map(|s| s.to_string()).collect());
-        //println!("{:?}", self.input[self.current_line].split_whitespace().map(|s| s.to_string()));
     }
 
     fn arrange(&mut self, txt: &str) -> String {
@@ -38,27 +41,35 @@ impl Lexicalizer {
     }
 
     pub fn lexicalize(&mut self) -> Option<Token> {
+        let r = self._lexicalize();
+        self.char += 1;
+        r
+    }
+    fn _lexicalize(&mut self) -> Option<Token> {
         if self.current_line >= self.input.len() || (self.current_line == self.input.len()-1 && self.arranger.is_empty()) {
             return None
         }
         if self.arranger.is_empty() {
             self.current_line += 1;
-            //println!("Line: {}", self.current_line);
+            debug!("Moving to line: {}", self.current_line);
             self.update_stack();
-            return Some(Token::eos())
+            return Some(Token::eos(self.current_line, self.char))
+
         } else {
-            //println!("{:?}", self.stack);
+            debug!("{:?}", self.arranger.get_stack());
             let text = self.arranger.pop().unwrap_or(String::from("."));
             let arranged = self.arrange(&text);
             if arranged == "" {
                 return None
             }
             if arranged == "--" {
+                debug!("Comment found");
                 self.empty_stack();
                 return None
             }
-            let token = Token::from_str(&arranged);
-            //println!("{:?}", self.stack);
+            let token = Token::from_str(&arranged, self.current_line, self.char);
+            debug!("Parsed token: {:?}", token);
+            debug!("Stack: {:?}", self.arranger.get_stack());
             return Some(token)
         }
     }
@@ -93,7 +104,7 @@ impl TokenStream {
     pub fn ignore_eos(&mut self, current_token: Token) -> Result<(), &'static str> {
         let mut ctoken = Some(current_token);
         while let Some(token) = ctoken.clone() {
-            if std::mem::discriminant(&token) != std::mem::discriminant(&Token::EOS) {
+            if token.as_discriminant() != Token::eos_discr() {
                 break
             }
             ctoken = self.next()
