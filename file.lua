@@ -1,1 +1,1 @@
-print(a, b) -- "a"
+print(a, b, 3, "hello") -- "a"

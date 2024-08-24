@@ -11,6 +11,7 @@ pub struct Token {
     ttype: TokenType
 }
 
+
 #[derive(Debug, Clone)]
 pub  enum TokenType {
     Keyword(Keyword),
@@ -41,6 +42,20 @@ impl Token {
                 char,
                 ttype: TokenType::Name(s.to_string())
             }
+        }
+    }
+
+    pub fn is_name(&self) -> bool {
+        match &self.ttype {
+            TokenType::Name(_) => true,
+            _ => false
+        }
+    }
+
+    pub fn is_literal(&self) -> bool {
+        match &self.ttype {
+            TokenType::Literal(_) => true,
+            _ => false
         }
     }
 

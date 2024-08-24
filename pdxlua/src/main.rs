@@ -28,11 +28,11 @@ fn main() {
 
     grammar.add_rule(
         RuleBuilder::new("_FUNCTION_CALL")
-            .add_name("_FUNCTION_NAME")
+            .add_name("func")
             .add_keyword("K_LEFTPAREN", Keyword::LeftParen)
             // Should be a resolable not just name but TEMPORARY
             // Will be replaced with a more complex rule
-            .add_repeat("args", RuleBuilder::new("args").add_name("arg").add_keyword(",", Keyword::Comma))
+            .add_repeat("args", RuleBuilder::new("args").add_get("arg").add_keyword(",", Keyword::Comma))
             .add_keyword("K_RIGHTPAREN", Keyword::RightParen)
     );
 

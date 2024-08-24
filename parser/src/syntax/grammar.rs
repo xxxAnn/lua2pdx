@@ -23,9 +23,9 @@ struct Command {
 pub enum CommandType {
     None(Discriminant<TokenType>),
     Keyword(Discriminant<Keyword>),
-    Get(String),
-    Repeat(Vec<Command>),
-    Or(Vec<Command>, Vec<Command>),
+    Get(String), // Name or Literal
+    Repeat(Vec<Command>), 
+    Or(Vec<Command>),
 }
 
 pub struct StatementBuilder {
@@ -48,18 +48,48 @@ enum StatementData {
 
 pub struct RuleBuilder {
     name: String,
-    rule: Vec<Command>
+    rule: Vec<Command>,
 }
 
 #[derive(Clone, Debug)]
 struct Rule {
     name: String,
-    rule: Vec<Command>
+    rule: Vec<Command>,
+    data: HashMap<String, Vec<Token>>,
+    food_index: (usize, usize)
 }
 
 enum TokenMatch {
     Token(Discriminant<TokenType>),
     Keyword(Discriminant<Keyword>)
+}
+
+impl Command {
+
+    fn matches_token(&self, token: &Token) -> bool {
+        match &self.ctype {
+            CommandType::None(discriminant) => {
+                *discriminant == token.as_discriminant()
+            },
+            CommandType::Keyword(discriminant) => {
+                match token.as_keyword() {
+                    Some(keyword) => {
+                        *discriminant == std::mem::discriminant(keyword)
+                    },
+                    None => false
+                }
+            },
+            CommandType::Get(_) => {
+                token.is_name() || token.is_literal()
+            }
+            CommandType::Or(v) => {
+                v.iter().any(|c| c.matches_token(token))
+            },
+            CommandType::Repeat(_) => {
+                false // Repeat is handled by the Rule struct
+            }
+        }
+    }
 }
 
 impl Grammar {
@@ -84,7 +114,7 @@ impl RuleBuilder {
     pub fn new(name: impl Into<String>) -> Self {
         RuleBuilder {
             name: name.into(),
-            rule: Vec::new()
+            rule: Vec::new(),
         }
     }
 
@@ -106,10 +136,11 @@ impl RuleBuilder {
         self
     }
 
-    pub fn add_get(mut self, name: impl Into<String>, get: impl Into<String>) -> Self {
+    pub fn add_get(mut self, name: impl Into<String>) -> Self {
+        let v = name.into(); 
         self.rule.push(Command {
-            name: name.into(),
-            ctype: CommandType::Get(get.into())
+            name: v.clone(),
+            ctype: CommandType::Get(v)
         });
 
         self
@@ -124,10 +155,10 @@ impl RuleBuilder {
         self
     }
 
-    pub fn add_or(mut self, name: impl Into<String>, left: RuleBuilder, right: RuleBuilder) -> Self {
+    pub fn add_or(mut self, name: impl Into<String>, rules: RuleBuilder) -> Self {
         self.rule.push(Command {
             name: name.into(),
-            ctype: CommandType::Or(left.rule, right.rule)
+            ctype: CommandType::Or(rules.rule)
         });
 
         self
@@ -136,7 +167,9 @@ impl RuleBuilder {
     fn build(self) -> Rule {
         Rule {
             name: self.name,
-            rule: self.rule
+            rule: self.rule,
+            data: HashMap::new(),
+            food_index: (0, 0)
         }
     }
 }
@@ -157,8 +190,8 @@ impl Rule {
     // Only consider the signature of the rule
 
     // Signature is defined as:
-    // The tokens before any Repeats, Ors or Gets
-    fn get_possible_tokens_at(&self, index: usize, grammar: &Grammar) -> Result<Vec<TokenMatch>, GrammarError> {
+    // The tokens before any Repeats or Ors
+    fn get_possible_tokens_at(&self, index: usize) -> Result<Vec<TokenMatch>, GrammarError> {
         let mut possible_tokens = Vec::new();
 
         for (i, command) in self.rule.iter().enumerate() {
@@ -166,7 +199,7 @@ impl Rule {
                 break;
             }
             match command.ctype {
-                CommandType::Get(_) | CommandType::Repeat(_) | CommandType::Or(_, _)  => { 
+                CommandType::Get(_) | CommandType::Repeat(_) | CommandType::Or(_)  => { 
                     return Err(GrammarError::OverlappingSignature);
                 },
                 _ => {
@@ -186,6 +219,96 @@ impl Rule {
         }
 
         Ok(possible_tokens)
+    }
+
+    fn get_current_command(&self) -> Option<&Command> {
+        if let Some(c) = self.rule.get(self.food_index.0) {
+            match &c.ctype {
+                CommandType::Repeat(v) => {
+                    info!("Repeating: {:?}, current at index: {:?}", v, self.food_index.1);
+                    if let Some(c) = v.get(self.food_index.1 % v.len()) {
+                        info!("Got {:?}", c);
+                        return Some(c);
+                    } else {
+                        return None;
+                    }
+                }
+                _ => {
+                    return Some(c);
+                }
+            }
+        }
+        None
+    }
+
+    fn current_command_is_repeat(&self) -> bool {
+        // We can't just call get_current_command and check if it's a repeat
+        // Because get_current_command will look inside the repeat and return a subcommand
+        // We need to check the current command directly
+        if let Some(c) = self.rule.get(self.food_index.0) {
+            match &c.ctype {
+                CommandType::Repeat(_) => {
+                    return true;
+                },
+                _ => {
+                    return false;
+                }
+            }
+        }
+        false
+    }
+
+    fn go_to_next_command(&mut self) {
+        //if let Some(c) = self.get_current_command() {
+            if self.current_command_is_repeat() {
+                self.food_index.1 += 1;
+            } else {
+                self.food_index.0 += 1;
+                self.food_index.1 = 0;
+            }
+        //}
+    }
+
+    /// This takes the token and gets the current command
+    /// Then it checks if the token matches the current command
+    /// If it doesn't, it increments the food_index.0 and resets food_index.1
+    /// This signifies that the repeat has ended and we are moving to the next command
+    /// If it does, it does nothing, signifying that the repeat is still going on
+    /// Technically food_index.1 should always be 0 when food_index.0 is incremented
+    /// Otherwise we are ending a repeat in the middle of it
+    fn check_if_repeat_ended(&mut self, token: &Token) {        
+        if let Some(c) = self.get_current_command() {
+            if c.matches_token(token) {
+                return;
+            }
+        }
+        self.food_index = (self.food_index.0 + 1, 0);
+    }
+
+    fn eat_token(&mut self, token: &Token) {
+        self.check_if_repeat_ended(&token);
+        if let Some(c) = self.get_current_command() {
+            if c.matches_token(&token) {
+                match &c.ctype {
+                    CommandType::Get(name) => { self.data.entry(name.clone()).or_insert(Vec::new()).push(token.clone()); },
+                    CommandType::None(n) => {
+                        if n == &Token::name_discr() {
+                            self.data.entry(c.name.clone()).or_insert(Vec::new()).push(token.clone());
+                        }
+                    }
+                    _ => { }
+                }
+                self.go_to_next_command();
+            }
+        }
+    }
+
+    fn is_satiated(&mut self, token: &Token) -> bool {
+        // Either we have reached the end of the rule
+        // Or this rule ends with a repeat and we have reached the end of the repeat
+        info!("Checking if satiated: {:?} {:?} {:?}", token, self.get_current_command(), self.food_index);
+        self.check_if_repeat_ended(token);
+        self.get_current_command().is_none()
     }
 }
 
@@ -241,9 +364,9 @@ impl StatementBuilder {
     }
 
     fn fits_rule_at(&self, token: Token, rule: &Rule, at_index: usize) -> bool {
-        debug!("{} expects {:?} at position {} in signature.", rule.name, rule.get_possible_tokens_at(at_index, &self.grammar), at_index);
+        debug!("{} expects {:?} at position {} in signature.", rule.name, rule.get_possible_tokens_at(at_index), at_index);
         debug!("Got {:?}", &token);
-        let r = rule.get_possible_tokens_at(at_index, &self.grammar).unwrap().iter().any(|t| t.matches(&token));
+        let r = rule.get_possible_tokens_at(at_index).unwrap().iter().any(|t| t.matches(&token));
 
         if !r {
             debug!("{} is eliminated.", rule.name);
@@ -283,11 +406,21 @@ impl StatementBuilder {
         info!("Saved tokens: {:?}", &self.saved_tokens.clone()[..(3.min(self.saved_tokens.len()-1))]);
         info!("Current token: {:?}", token_stream.current().unwrap());
 
-        for n in token_stream {
-            debug!("\x1b[93mRemaining token\x1b[0m: {:?}", n);
+        let mut selected_rule = self.get_rule().unwrap().clone();
+
+        for n in self.saved_tokens.iter() {
+            selected_rule.eat_token(n);
         }
 
-        error!("Implement the rest of the function");
+        while token_stream.current().is_some() && !selected_rule.is_satiated(&token_stream.current().unwrap()) {
+            info!("Not satiated yet: {:?}", &token_stream.current().unwrap());
+            selected_rule.eat_token(&token_stream.current().unwrap());
+            token_stream.advance();
+        }
+        info!("Satiated: {:?}", &token_stream.current().unwrap());
+
+        dbg!(selected_rule.data.clone());
+        //dbg!(selected_rule);
 
         todo!()
     }
