@@ -10,7 +10,7 @@ use nom::{
     IResult,
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum LuaParserValue {
     // Any simple value (nil, boolean, number, string, identifier)
     // That can be used as a key in a table
@@ -22,13 +22,23 @@ pub enum LuaParserValue {
     Function(Vec<LuaStatement>),
 }
 
-#[derive(Debug, Hash, Eq, PartialEq)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub enum LuaKeyValue {
     Nil,
     Boolean(bool),
     Number(u64),
     String(String),
     Identifier(String),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum LuaStatement {
+    Assign(String, LuaParserValue),
+    FunctionCall(String, Vec<LuaParserValue>),
+    If(Vec<(LuaParserValue, Vec<LuaStatement>)>, Option<Vec<LuaStatement>>),
+    While(LuaParserValue, Vec<LuaStatement>),
+    Do(Vec<LuaStatement>),
+    Return(Vec<LuaParserValue>),
 }
 
 impl From<u64> for LuaParserValue {
@@ -98,16 +108,6 @@ impl Display for LuaKeyValue {
             LuaKeyValue::Identifier(ident) => write!(f, "{}", ident),
         }
     }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum LuaStatement {
-    Assign(String, LuaParserValue),
-    FunctionCall(String, Vec<LuaParserValue>),
-    If(Vec<(LuaParserValue, Vec<LuaStatement>)>, Option<Vec<LuaStatement>>),
-    While(LuaParserValue, Vec<LuaStatement>),
-    Do(Vec<LuaStatement>),
-    Return(Vec<LuaParserValue>),
 }
 
 pub fn parse_number(input: &str) -> IResult<&str, LuaParserValue> {
