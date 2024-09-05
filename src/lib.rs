@@ -1,2 +1,2 @@
-#![warn(clippy::all, clippy::pedantic)]
+#![warn(clippy::pedantic)]
 pub mod parser;
