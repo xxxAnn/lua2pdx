@@ -1,4 +1,4 @@
-use super::*;
+use super::{IResult, LuaKeyValue, LuaParserValue, LuaStatement, alt, char, delimited, digit1, opt, parse_spaces, recognize, tag, take_while1, tuple};
 
 pub fn parse_break(input: &str) -> IResult<&str, LuaStatement> {
     let (input, _) = tag("break")(input)?;

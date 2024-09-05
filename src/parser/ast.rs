@@ -66,19 +66,19 @@ impl LuaParserValue {
     pub fn string(s: impl Into<String>) -> Self {
         LuaParserValue::KeyValue(LuaKeyValue::String(s.into()))
     }
-    pub fn nil() -> Self {
+    #[must_use] pub fn nil() -> Self {
         LuaParserValue::KeyValue(LuaKeyValue::Nil)
     }
     pub fn bool(b: impl Into<bool>) -> Self {
         LuaParserValue::KeyValue(LuaKeyValue::Boolean(b.into()))
     }
-    pub fn table(t: HashMap<LuaKeyValue, LuaParserValue>) -> Self {
+    #[must_use] pub fn table(t: HashMap<LuaKeyValue, LuaParserValue>) -> Self {
         LuaParserValue::Table(t)
     }
-    pub fn function(name: String, statements: Vec<LuaStatement>, args: Vec<LuaParserValue>) -> Self {
+    #[must_use] pub fn function(name: String, statements: Vec<LuaStatement>, args: Vec<LuaParserValue>) -> Self {
         LuaParserValue::Function(name, statements, args)
     }
-    pub fn as_assign(&self) -> Option<LuaStatement> {
+    #[must_use] pub fn as_assign(&self) -> Option<LuaStatement> {
         match self {
             LuaParserValue::Function(n, _, _) => {
                 Some(LuaStatement::Assign(LuaParserValue::identifier(n), self.clone()))
@@ -88,10 +88,10 @@ impl LuaParserValue {
             }
         }
     }
-    pub fn expect_key_value(&self) -> LuaKeyValue {
+    #[must_use] pub fn expect_key_value(&self) -> LuaKeyValue {
         match self {
             LuaParserValue::KeyValue(kv) => kv.clone(),
-            _ => panic!("Expected key value, found {:?}", self),
+            _ => panic!("Expected key value, found {self:?}"),
         }
     }
 }
@@ -99,8 +99,8 @@ impl LuaParserValue {
 impl Display for LuaParserValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LuaParserValue::KeyValue(simple_value) => write!(f, "{}", simple_value),
-            LuaParserValue::Float(n) => write!(f, "{}", n),
+            LuaParserValue::KeyValue(simple_value) => write!(f, "{simple_value}"),
+            LuaParserValue::Float(n) => write!(f, "{n}"),
             LuaParserValue::Table(t) => {
                 let mut first = true;
                 write!(f, "{{")?;
@@ -108,16 +108,16 @@ impl Display for LuaParserValue {
                     if !first {
                         write!(f, ", ")?;
                     }
-                    write!(f, "{} = {}", key, value)?;
+                    write!(f, "{key} = {value}")?;
                     first = false;
                 }
                 write!(f, "}}")
             },
             LuaParserValue::Function(_, _, _) => write!(f, "function(...) ... end"),
-            LuaParserValue::Operation(a, op, b) => write!(f, "({} {} {})", a, op, b),
-            LuaParserValue::Conditional(a, op, b) => write!(f, "({} {} {})", a, op, b),
+            LuaParserValue::Operation(a, op, b) => write!(f, "({a} {op} {b})"),
+            LuaParserValue::Conditional(a, op, b) => write!(f, "({a} {op} {b})"),
             LuaParserValue::NumericFor(var, start, end, step) => {
-                write!(f, "for {} = {}, {}, {}", var, start, end, step.as_ref().map(|s| s.to_string()).unwrap_or("1".to_string()))
+                write!(f, "for {} = {}, {}, {}", var, start, end, step.as_ref().map_or("1".to_string(), std::string::ToString::to_string))
             },
             LuaParserValue::GenericFor(var, iter) => {
                 write!(f, "")
@@ -130,10 +130,10 @@ impl Display for LuaKeyValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             LuaKeyValue::Nil => write!(f, "nil"),
-            LuaKeyValue::Boolean(b) => write!(f, "{}", b),
-            LuaKeyValue::Number(n) => write!(f, "{}", n),
-            LuaKeyValue::String(s) => write!(f, "\"{}\"", s),
-            LuaKeyValue::Identifier(ident) => write!(f, "{}", ident),
+            LuaKeyValue::Boolean(b) => write!(f, "{b}"),
+            LuaKeyValue::Number(n) => write!(f, "{n}"),
+            LuaKeyValue::String(s) => write!(f, "\"{s}\""),
+            LuaKeyValue::Identifier(ident) => write!(f, "{ident}"),
         }
     }
 }
