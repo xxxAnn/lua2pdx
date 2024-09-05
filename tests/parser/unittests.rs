@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use pdxlua::parser::{parse_boolean, parse_identifier, parse_nil, parse_number, parse_string, parse_root_statements, LuaKeyValue, LuaParserValue, LuaStatement};
+use pdxlua::parser::{parse_boolean, parse_identifier, parse_nil, parse_number, parse_string, LuaKeyValue, LuaParserValue};
 
 
 #[test]
