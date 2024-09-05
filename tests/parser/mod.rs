@@ -8,5 +8,5 @@ pub fn full_test() {
 
     let res = parse_root_statements(&text).unwrap();
 
-    let _ = std::fs::write("dump.txt", serde_json::to_string_pretty(&res.1).unwrap());
+    let _ = std::fs::write("dump.json", serde_json::to_string_pretty(&res.1).unwrap());
 }
