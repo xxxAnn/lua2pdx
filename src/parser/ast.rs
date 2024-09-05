@@ -49,13 +49,13 @@ pub enum LuaStatement {
 
 impl From<u64> for LuaParserValue {
     fn from(value: u64) -> Self {
-        LuaParserValue::KeyValue(LuaKeyValue::Number(value.into()))
+        LuaParserValue::KeyValue(LuaKeyValue::Number(value))
     }
 }
 
 impl From<f64> for LuaParserValue {
     fn from(value: f64) -> Self {
-        LuaParserValue::Float(value.into())
+        LuaParserValue::Float(value)
     }
 }
 
