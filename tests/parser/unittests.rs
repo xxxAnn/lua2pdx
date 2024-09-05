@@ -1,6 +1,18 @@
 use std::collections::HashMap;
 
-use pdxlua::parser::{parse_boolean, parse_identifier, parse_nil, parse_number, parse_string, LuaKeyValue, LuaParserValue, LuaStatement};
+use pdxlua::parser::{parse_boolean, parse_identifier, parse_nil, parse_number, parse_string, parse_root_statements, LuaKeyValue, LuaParserValue, LuaStatement};
+
+#[test]
+pub fn full_test() {
+    let text = r"
+function hello(a, b) do
+    c = a * 2
+    return c + b*a
+end
+    ";
+
+    dbg!(parse_root_statements(text).unwrap());
+}
 
 #[test]
 fn test_parse_number_integer() {
@@ -89,18 +101,4 @@ fn test_parse_table() {
     );
 
     assert_eq!(value, LuaParserValue::Table(formatted_table));
-}
-
-#[test]
-fn test_parse_function() {
-    let statements = vec![
-        LuaStatement::Assign(
-            String::from("x"),
-            LuaParserValue::KeyValue(LuaKeyValue::Number(10))
-        ),
-        LuaStatement::Return(vec![LuaParserValue::KeyValue(LuaKeyValue::Identifier(String::from("x")))]),
-    ];
-    let function = LuaParserValue::Function(statements.clone());
-
-    assert_eq!(function, LuaParserValue::Function(statements));
 }

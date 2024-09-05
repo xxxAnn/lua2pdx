@@ -1,25 +1,16 @@
-use std::{collections::HashMap, fmt::Display};
-
+use std::collections::HashMap;
 use nom::{
-    branch::alt,
-    bytes::complete::{escaped_transform, tag, take_while1},
-    character::complete::{char, digit1, one_of},
-    combinator::{map, opt, recognize},
-    multi::many0,
-    sequence::{delimited, preceded, tuple},
-    IResult,
+    branch::alt, bytes::complete::{tag, take_until, take_while1}, character::complete::{char, digit1, one_of}, combinator::{opt, recognize}, multi::{many0, separated_list0}, sequence::{delimited, preceded, terminated, tuple}, IResult
 };
+use std::fmt::Display;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum LuaParserValue {
-    // Any simple value (nil, boolean, number, string, identifier)
-    // That can be used as a key in a table
     KeyValue(LuaKeyValue),
-    // Complex value (table, function)
-    // They can only be used as values in a table
     Float(f64),
     Table(HashMap<LuaKeyValue, LuaParserValue>),
-    Function(Vec<LuaStatement>),
+    Function(String, Vec<LuaStatement>, Vec<LuaParserValue>),
+    Operation(Box<LuaParserValue>, char, Box<LuaParserValue>),
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
@@ -33,12 +24,10 @@ pub enum LuaKeyValue {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum LuaStatement {
-    Assign(String, LuaParserValue),
-    FunctionCall(String, Vec<LuaParserValue>),
-    If(Vec<(LuaParserValue, Vec<LuaStatement>)>, Option<Vec<LuaStatement>>),
-    While(LuaParserValue, Vec<LuaStatement>),
-    Do(Vec<LuaStatement>),
-    Return(Vec<LuaParserValue>),
+    Assign(LuaParserValue, LuaParserValue),
+    FunctionCall(LuaParserValue, Vec<LuaParserValue>),
+    Return(LuaParserValue),
+    // Todo: Add more control flow structures
 }
 
 impl From<u64> for LuaParserValue {
@@ -69,12 +58,20 @@ impl LuaParserValue {
     pub fn table(t: HashMap<LuaKeyValue, LuaParserValue>) -> Self {
         LuaParserValue::Table(t)
     }
-    pub fn function(statements: Vec<LuaStatement>) -> Self {
-        LuaParserValue::Function(statements)
+    pub fn function(name: String, statements: Vec<LuaStatement>, args: Vec<LuaParserValue>) -> Self {
+        LuaParserValue::Function(name, statements, args)
+    }
+    pub fn as_assign(&self) -> Option<LuaStatement> {
+        match self {
+            LuaParserValue::Function(n, _, _) => {
+                Some(LuaStatement::Assign(LuaParserValue::identifier(n), self.clone()))
+            }
+            _ => {
+                None
+            }
+        }
     }
 }
-
-// PartialEq implementation for LuaParserValue already done via `#[derive(PartialEq)]`
 
 impl Display for LuaParserValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -93,7 +90,8 @@ impl Display for LuaParserValue {
                 }
                 write!(f, "}}")
             },
-            LuaParserValue::Function(_) => write!(f, "function(...) ... end"),
+            LuaParserValue::Function(_, _, _) => write!(f, "function(...) ... end"),
+            LuaParserValue::Operation(a, op, b) => write!(f, "({} {} {})", a, op, b),
         }
     }
 }
@@ -124,10 +122,10 @@ pub fn parse_number(input: &str) -> IResult<&str, LuaParserValue> {
 pub fn parse_string(input: &str) -> IResult<&str, LuaParserValue> {
     let (input, string) = delimited(
         char('"'),
-        escaped_transform(take_while1(|c| c != '"' && c != '\\'), '\\', one_of("\"n\\")),
+        take_while1(|c| c != '"'),
         char('"')
     )(input)?;
-    Ok((input, LuaParserValue::KeyValue(LuaKeyValue::String(string))))
+    Ok((input, LuaParserValue::KeyValue(LuaKeyValue::String(string.to_string()))))
 }
 
 pub fn parse_boolean(input: &str) -> IResult<&str, LuaParserValue> {
@@ -144,4 +142,128 @@ pub fn parse_nil(input: &str) -> IResult<&str, LuaParserValue> {
 pub fn parse_identifier(input: &str) -> IResult<&str, LuaParserValue> {
     let (input, ident) = take_while1(|c: char| c.is_alphanumeric() || c == '_')(input)?;
     Ok((input, LuaParserValue::KeyValue(LuaKeyValue::Identifier(ident.to_string()))))
+}
+
+pub fn parse_primary_expression(input: &str) -> IResult<&str, LuaParserValue> {
+    alt((parse_number, parse_string, parse_boolean, parse_nil, parse_identifier))(input)
+}
+
+
+pub fn parse_operation_recursive(input: &str, lhs: LuaParserValue) -> IResult<&str, LuaParserValue> {
+    let (input, _) = opt(parse_spaces)(input)?;
+
+    let (input, op) = opt(alt((char('+'), char('-'), char('*'), char('/'))))(input)?;
+    
+    if let Some(op) = op {
+        let (input, _) = opt(parse_spaces)(input)?;
+
+        let (input, rhs) = parse_primary_expression(input)?;
+
+        let result = LuaParserValue::Operation(Box::new(lhs), op, Box::new(rhs));
+        parse_operation_recursive(input, result) // Recursive call
+    } else {
+        Ok((input, lhs))
+    }
+}
+
+pub fn parse_expression(input: &str) -> IResult<&str, LuaParserValue> {
+    // First, parse the primary expression
+    let (input, lhs) = parse_primary_expression(input)?;
+
+    // Then try to parse any following operations
+    parse_operation_recursive(input, lhs)
+}
+
+
+pub fn parse_assign(input: &str) -> IResult<&str, LuaStatement> {
+    let (input, _) = parse_spaces(input)?;
+    let (input, ident) = parse_identifier(input)?;
+    let (input, _) = many0(char(' '))(input)?;
+    let (input, _) = tag("=")(input)?;
+    let (input, _) = many0(char(' '))(input)?;
+    let (input, value) = parse_expression(input)?;
+    Ok((input, LuaStatement::Assign(ident, value)))
+}
+
+pub fn parse_function_call(input: &str) -> IResult<&str, LuaStatement> {
+    let (input, _) = parse_spaces(input)?;
+    let (input, ident) = parse_identifier(input)?;
+    let (input, _) = many0(char(' '))(input)?;
+    let (input, _) = tag("(")(input)?;
+    let (input, args) = separated_list0(tag(","), parse_expression)(input)?;
+    let (input, _) = tag(")")(input)?;
+    Ok((input, LuaStatement::FunctionCall(ident, args)))
+}
+
+pub fn parse_return(input: &str) -> IResult<&str, LuaStatement> {
+    let (input, _) = parse_spaces(input)?;
+    let (input, _) = tag("return")(input)?;
+    let (input, _) = parse_spaces(input)?;
+    println!("idkl17 {}", input);
+    println!("idkl18 {}", input == " a + b");
+    let (input, value) = parse_expression(input)?;
+    Ok((input, LuaStatement::Return(value)))
+}
+
+pub fn parse_basic_statement(input: &str) -> IResult<&str, LuaStatement> {
+    alt((parse_assign, parse_function_call, parse_return))(input)
+}
+
+fn parse_space(input: &str) -> IResult<&str, ()> {
+    let (input, _) = char(' ')(input)?;
+    Ok((input, ()))
+}
+
+fn parse_spaces(input: &str) -> IResult<&str, ()> {
+    let (input, _) = many0(parse_space)(input)?;
+    Ok((input, ()))
+}
+
+fn parse_newline(input: &str) -> IResult<&str, ()> {
+    let (input, _) = alt((char('\n'), char('\r')))(input)?;
+    Ok((input, ()))
+}
+
+fn parse_newlines(input: &str) -> IResult<&str, ()> {
+    let (input, _) = many0(parse_newline)(input)?;
+    Ok((input, ()))
+}
+
+fn clear_noise(input: &str) -> IResult<&str, ()> {
+    let (input, _) = many0(alt((parse_space, parse_newline)))(input)?;
+    Ok((input, ()))
+}
+
+fn parse_argument_list(input: &str) -> IResult<&str, Vec<LuaParserValue>> {
+    let (input, _) = tag("(")(input)?;
+    let (input, args) = separated_list0(tag(","), delimited(opt(parse_spaces), parse_expression, opt(parse_spaces)))(input)?;
+    let (input, _) = tag(")")(input)?;
+    Ok((input, args))
+}
+
+pub fn parse_function_definition(input: &str) -> IResult<&str, LuaParserValue> {
+    let (input, _) = tag("function")(input)?;
+    let (input, _) = opt(parse_spaces)(input)?;
+    let (input, name) = parse_identifier(input)?;
+    let (input, args) = parse_argument_list(input)?;
+    let (input, _) = opt(parse_spaces)(input)?;
+    let (input, _) = tag("do")(input)?;
+    let (input, _) = parse_newlines(input)?;
+    let (input, statements) = many0(delimited(clear_noise, parse_basic_statement, clear_noise))(input)?;
+    let (input, _) = parse_newlines(input)?;
+    let (input, _) = tag("end")(input)?;
+    Ok((input, LuaParserValue::Function(name.to_string(), statements, args)))//statements, args)))
+}
+
+pub fn parse_function_definition_as_statement(input: &str) -> IResult<&str, LuaStatement> {
+    let (input, function) = parse_function_definition(input)?;
+    Ok((input, function.as_assign().unwrap()))
+}
+
+pub fn parse_root_statement(input: &str) -> IResult<&str, LuaStatement> {
+    alt((parse_basic_statement, parse_function_definition_as_statement))(input)
+}
+
+pub fn parse_root_statements(input: &str) -> IResult<&str, Vec<LuaStatement>> {
+    many0(preceded(opt(clear_noise), parse_root_statement))(input)
 }
