@@ -2,17 +2,6 @@ use std::collections::HashMap;
 
 use pdxlua::parser::{parse_boolean, parse_identifier, parse_nil, parse_number, parse_string, parse_root_statements, LuaKeyValue, LuaParserValue, LuaStatement};
 
-#[test]
-pub fn full_test() {
-    let text = r"
-function hello(a, b) do
-    c = a * 2
-    return c + b*a
-end
-    ";
-
-    dbg!(parse_root_statements(text).unwrap());
-}
 
 #[test]
 fn test_parse_number_integer() {

@@ -3,17 +3,23 @@ use nom::{
     branch::alt, bytes::complete::{tag, take_until, take_while1}, character::complete::{char, digit1, one_of}, combinator::{opt, recognize}, multi::{many0, separated_list0}, sequence::{delimited, preceded, terminated, tuple}, IResult
 };
 use std::fmt::Display;
+use serde::Serialize;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub enum LuaParserValue {
     KeyValue(LuaKeyValue),
     Float(f64),
     Table(HashMap<LuaKeyValue, LuaParserValue>),
     Function(String, Vec<LuaStatement>, Vec<LuaParserValue>),
     Operation(Box<LuaParserValue>, char, Box<LuaParserValue>),
+
+    // var=1,10,(1)
+    Conditional(Box<LuaParserValue>, String, Box<LuaParserValue>),
+    NumericFor(LuaKeyValue, Box<LuaParserValue>, Box<LuaParserValue>, Option<Box<LuaParserValue>>),
+    GenericFor(LuaKeyValue, Option<LuaKeyValue>)
 }
 
-#[derive(Debug, Hash, Eq, PartialEq, Clone)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize)]
 pub enum LuaKeyValue {
     Nil,
     Boolean(bool),
@@ -22,12 +28,26 @@ pub enum LuaKeyValue {
     Identifier(String),
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub enum LuaStatement {
     Assign(LuaParserValue, LuaParserValue),
     FunctionCall(LuaParserValue, Vec<LuaParserValue>),
     Return(LuaParserValue),
     // Todo: Add more control flow structures
+    Break,
+    // Contains the condition: LuaParserValue
+    // The statements: Vec<LuaStatement>
+    // The else if statements: Vec<LuaStatement>
+    // The else statements: Option<LuaStatement>
+    If(LuaParserValue, Vec<LuaStatement>, Vec<LuaStatement>, Option<Box<LuaStatement>>),
+    Else(Vec<LuaStatement>),
+    While(LuaParserValue, Vec<LuaStatement>),
+    // In a Numeric For the LuaParserValue
+    // Contains the NumericFor Variant
+    // In a Generic For the LuaParserValue
+    // Contains the GenericFor Variant
+    // And its first LuaStatement contains the object to iterate over
+    For(LuaParserValue, Vec<LuaStatement>)
 }
 
 impl From<u64> for LuaParserValue {
@@ -71,6 +91,12 @@ impl LuaParserValue {
             }
         }
     }
+    pub fn expect_key_value(&self) -> LuaKeyValue {
+        match self {
+            LuaParserValue::KeyValue(kv) => kv.clone(),
+            _ => panic!("Expected key value, found {:?}", self),
+        }
+    }
 }
 
 impl Display for LuaParserValue {
@@ -92,6 +118,13 @@ impl Display for LuaParserValue {
             },
             LuaParserValue::Function(_, _, _) => write!(f, "function(...) ... end"),
             LuaParserValue::Operation(a, op, b) => write!(f, "({} {} {})", a, op, b),
+            LuaParserValue::Conditional(a, op, b) => write!(f, "({} {} {})", a, op, b),
+            LuaParserValue::NumericFor(var, start, end, step) => {
+                write!(f, "for {} = {}, {}, {}", var, start, end, step.as_ref().map(|s| s.to_string()).unwrap_or("1".to_string()))
+            },
+            LuaParserValue::GenericFor(var, iter) => {
+                write!(f, "for {} in {}", var, iter.as_ref().map(|i| i.to_string()).unwrap_or("".to_string()))
+            }
         }
     }
 }
@@ -107,6 +140,121 @@ impl Display for LuaKeyValue {
         }
     }
 }
+
+pub fn parse_break(input: &str) -> IResult<&str, LuaStatement> {
+    let (input, _) = tag("break")(input)?;
+    Ok((input, LuaStatement::Break))
+}
+
+pub fn parse_if(input: &str) -> IResult<&str, LuaStatement> {
+    let (input, _) = tag("if")(input)?;
+    let (input, _) = parse_spaces(input)?;
+    let (input, condition) = parse_conditional(input)?;
+    let (input, _) = tag("then")(input)?;
+    let (input, _) = parse_newlines(input)?;
+    let (input, if_statements) = many0(delimited(clear_noise, parse_root_statement, clear_noise))(input)?;
+    
+    // Optionally parse elseif blocks
+    let (input, else_if_statements) = many0(parse_elseif)(input)?;
+
+    // Optionally parse else block
+    let (input, else_statements) = opt(parse_else)(input)?;
+
+    let (input, _) = tag("end")(input)?;
+
+    Ok((
+        input,
+        LuaStatement::If(
+            condition,
+            if_statements,
+            else_if_statements.concat(), // Flatten elseif blocks into the same vector as regular if-statements
+            else_statements.map(|s| Box::new(LuaStatement::Else(s))),
+        ),
+    ))
+}
+
+pub fn parse_while(input: &str) -> IResult<&str, LuaStatement> {
+    let (input, _) = tag("while")(input)?;
+    let (input, _) = parse_spaces(input)?;
+    let (input, condition) = parse_expression(input)?;
+    let (input, _) = tag("do")(input)?;
+    let (input, _) = parse_newlines(input)?;
+    let (input, body) = many0(delimited(clear_noise, parse_root_statement, clear_noise))(input)?;
+    let (input, _) = tag("end")(input)?;
+    Ok((input, LuaStatement::While(condition, body)))
+}
+
+pub fn parse_numeric_for(input: &str) -> IResult<&str, LuaStatement> {
+    let (input, _) = tag("for")(input)?;
+    let (input, _) = parse_spaces(input)?;
+    let (input, var) = parse_identifier(input)?;
+    let (input, _) = tag("=")(input)?;
+    let (input, start) = parse_expression(input)?;
+    let (input, _) = tag(",")(input)?;
+    let (input, end) = parse_expression(input)?;
+
+    // Optional step
+    let (input, step) = opt(preceded(tag(","), parse_expression))(input)?;
+
+    let (input, _) = tag("do")(input)?;
+    let (input, _) = parse_newlines(input)?;
+    let (input, body) = many0(delimited(clear_noise, parse_root_statement, clear_noise))(input)?;
+    let (input, _) = tag("end")(input)?;
+    
+    Ok((
+        input,
+        LuaStatement::For(
+            LuaParserValue::NumericFor(
+                var.expect_key_value(), 
+                Box::new(start), 
+                Box::new(end), 
+                step.map(Box::new),
+            ),
+            body,
+        ),
+    ))
+}
+
+pub fn parse_generic_for(input: &str) -> IResult<&str, LuaStatement> {
+    let (input, _) = tag("for")(input)?;
+    let (input, _) = parse_spaces(input)?;
+    let (input, var) = parse_identifier(input)?;
+    let (input, _) = tag("in")(input)?;
+    let (input, iterable) = parse_expression(input)?;
+    let (input, _) = tag("do")(input)?;
+    let (input, _) = parse_newlines(input)?;
+    let (input, body) = many0(delimited(clear_noise, parse_root_statement, clear_noise))(input)?;
+    let (input, _) = tag("end")(input)?;
+    
+    Ok((
+        input,
+        LuaStatement::For(
+            LuaParserValue::GenericFor(var.expect_key_value(), None),
+            body,
+        ),
+    ))
+}
+
+
+
+
+fn parse_elseif(input: &str) -> IResult<&str, Vec<LuaStatement>> {
+    let (input, _) = tag("elseif")(input)?;
+    let (input, _) = parse_spaces(input)?;
+    let (input, condition) = parse_expression(input)?;
+    let (input, _) = tag("then")(input)?;
+    let (input, _) = parse_newlines(input)?;
+    let (input, statements) = many0(delimited(clear_noise, parse_root_statement, clear_noise))(input)?;
+    Ok((input, vec![LuaStatement::If(condition, statements, vec![], None)]))
+}
+
+fn parse_else(input: &str) -> IResult<&str, Vec<LuaStatement>> {
+    let (input, _) = tag("else")(input)?;
+    let (input, _) = parse_newlines(input)?;
+    let (input, statements) = many0(delimited(clear_noise, parse_root_statement, clear_noise))(input)?;
+    Ok((input, statements))
+}
+
 
 pub fn parse_number(input: &str) -> IResult<&str, LuaParserValue> {
     let (input, num_str) = recognize(tuple((opt(char('-')), digit1, opt(tuple((char('.'), digit1))))))(input)?;
@@ -143,6 +291,38 @@ pub fn parse_identifier(input: &str) -> IResult<&str, LuaParserValue> {
     let (input, ident) = take_while1(|c: char| c.is_alphanumeric() || c == '_')(input)?;
     Ok((input, LuaParserValue::KeyValue(LuaKeyValue::Identifier(ident.to_string()))))
 }
+
+pub fn parse_conditional_recursive(input: &str, lhs: LuaParserValue) -> IResult<&str, LuaParserValue> {
+    let (input, _) = opt(parse_spaces)(input)?;
+
+    let (input, op) = opt(alt((
+        tag("=="),
+        tag("~="),    // Not equal
+        tag("<="),
+        tag(">="),
+        tag("<"),
+        tag(">"),
+        tag("and"),
+        tag("or"),
+    )))(input)?;
+
+    if let Some(op) = op {
+        let (input, _) = opt(parse_spaces)(input)?;
+
+        let (input, rhs) = parse_primary_expression(input)?;
+
+        let result = LuaParserValue::Conditional(Box::new(lhs), op.to_string(), Box::new(rhs));
+        parse_conditional_recursive(input, result) // Recursively handle chained conditionals
+    } else {
+        Ok((input, lhs))
+    }
+}
+
+pub fn parse_conditional(input: &str) -> IResult<&str, LuaParserValue> {
+    let (input, lhs) = parse_primary_expression(input)?;
+    parse_conditional_recursive(input, lhs)
+}
+
 
 pub fn parse_primary_expression(input: &str) -> IResult<&str, LuaParserValue> {
     alt((parse_number, parse_string, parse_boolean, parse_nil, parse_identifier))(input)
@@ -199,14 +379,21 @@ pub fn parse_return(input: &str) -> IResult<&str, LuaStatement> {
     let (input, _) = parse_spaces(input)?;
     let (input, _) = tag("return")(input)?;
     let (input, _) = parse_spaces(input)?;
-    println!("idkl17 {}", input);
-    println!("idkl18 {}", input == " a + b");
     let (input, value) = parse_expression(input)?;
     Ok((input, LuaStatement::Return(value)))
 }
 
 pub fn parse_basic_statement(input: &str) -> IResult<&str, LuaStatement> {
-    alt((parse_assign, parse_function_call, parse_return))(input)
+    alt((
+        parse_assign,               // Assignment statement
+        parse_function_call,        // Function call statement
+        parse_return,               // Return statement
+        parse_break,                // Break statement
+        parse_if,                   // If statement
+        parse_while,                // While statement
+        parse_numeric_for,          // Numeric for loop
+        parse_generic_for,          // Generic for loop
+    ))(input)
 }
 
 fn parse_space(input: &str) -> IResult<&str, ()> {

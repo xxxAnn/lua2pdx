@@ -1,0 +1,118 @@
+[
+  {
+    "Assign": [
+      {
+        "KeyValue": {
+          "Identifier": "hello"
+        }
+      },
+      {
+        "Function": [
+          "hello",
+          [
+            {
+              "Assign": [
+                {
+                  "KeyValue": {
+                    "Identifier": "c"
+                  }
+                },
+                {
+                  "Operation": [
+                    {
+                      "KeyValue": {
+                        "Identifier": "a"
+                      }
+                    },
+                    "*",
+                    {
+                      "KeyValue": {
+                        "Number": 2
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "If": [
+                {
+                  "Conditional": [
+                    {
+                      "KeyValue": {
+                        "Identifier": "c"
+                      }
+                    },
+                    ">",
+                    {
+                      "KeyValue": {
+                        "Identifier": "b"
+                      }
+                    }
+                  ]
+                },
+                [
+                  {
+                    "Assign": [
+                      {
+                        "KeyValue": {
+                          "Identifier": "c"
+                        }
+                      },
+                      {
+                        "KeyValue": {
+                          "Identifier": "b"
+                        }
+                      }
+                    ]
+                  }
+                ],
+                [],
+                null
+              ]
+            },
+            {
+              "Return": {
+                "Operation": [
+                  {
+                    "Operation": [
+                      {
+                        "KeyValue": {
+                          "Identifier": "c"
+                        }
+                      },
+                      "+",
+                      {
+                        "KeyValue": {
+                          "Identifier": "b"
+                        }
+                      }
+                    ]
+                  },
+                  "*",
+                  {
+                    "KeyValue": {
+                      "Identifier": "a"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          [
+            {
+              "KeyValue": {
+                "Identifier": "a"
+              }
+            },
+            {
+              "KeyValue": {
+                "Identifier": "b"
+              }
+            }
+          ]
+        ]
+      }
+    ]
+  }
+]
