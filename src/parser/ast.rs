@@ -120,7 +120,7 @@ impl Display for LuaParserValue {
                 write!(f, "for {} = {}, {}, {}", var, start, end, step.as_ref().map(|s| s.to_string()).unwrap_or("1".to_string()))
             },
             LuaParserValue::GenericFor(var, iter) => {
-                write!(f, "for {} in {}", var, iter.as_ref().map(|i| i.to_string()).unwrap_or("".to_string()))
+                write!(f, "")
             }
         }
     }
